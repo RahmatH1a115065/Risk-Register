@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Form Penilaian Register Risiko PPUPD</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    h2 {
+      color: #2c3e50;
+    }
+    form {
+      margin-bottom: 40px;
+      border: 1px solid #ccc;
+      padding: 20px;
+      border-radius: 10px;
+      background: #f9f9f9;
+    }
+    table.form-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table.form-table td {
+      padding: 8px;
+      vertical-align: top;
+    }
+    label {
+      font-weight: bold;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 6px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .readonly {
+      background-color: #eee;
+    }
+    .export-button {
+      margin-right: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    canvas {
+      max-width: 600px;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Form Aplikasi Register Risiko PPUPD</h1>
+
+  <!-- FORM 1: Penetapan Konteks dan Tujuan Strategis -->
+  <form id="formKonteks">
+    <h2>1️⃣ Penetapan Konteks & Tujuan Risiko Strategis OPD</h2>
+    <table class="form-table">
+      <tr><td><label>Nama OPD</label></td><td><input type="text" id="konOPD"></td></tr>
+      <tr><td><label>Tujuan OPD</label></td><td><textarea id="konTujuan"></textarea></td></tr>
+      <tr><td><label>Sasaran OPD</label></td><td><textarea id="konSasaran"></textarea></td></tr>
+      <tr><td><label>Isu Strategis</label></td><td><textarea id="konIsu"></textarea></td></tr>
+      <tr><td><label>Konteks Internal</label></td><td><textarea id="konInternal"></textarea></td></tr>
+      <tr><td><label>Konteks Eksternal</label></td><td><textarea id="konEksternal"></textarea></td></tr>
+    </table>
+    <button type="button" onclick="simpanKonteks()">Simpan Konteks</button>
+  </form>
+
+  <!-- FORM 2: Register Risiko -->
+  <form>
+    <h2>2️⃣ Form Register Risiko</h2>
+    <table class="form-table">
+      <tr><td><label>Nama OPD</label></td><td><input id="opd"></td></tr>
+      <tr><td><label>Nama Risiko</label></td><td><input id="namaRisiko"></td></tr>
+      <tr><td><label>Kemungkinan (1-5)</label></td><td><input type="number" id="kemungkinan" min="1" max="5" onchange="hitungLevelRisiko()"></td></tr>
+      <tr><td><label>Dampak (1-5)</label></td><td><input type="number" id="dampak" min="1" max="5" onchange="hitungLevelRisiko()"></td></tr>
+      <tr><td><label>Level Risiko</label></td><td><input id="levelRisiko" class="readonly" readonly></td></tr>
+      <tr><td><label>Warna Risiko</label></td><td><input id="warnaRisiko" class="readonly" readonly></td></tr>
+    </table>
+    <button type="button" onclick="simpanRisiko()">Simpan Risiko</button>
+  </form>
+
+  <!-- FORM 3: Prioritas dan Mitigasi Risiko -->
+  <form>
+    <h2>3️⃣ Form Prioritas dan Mitigasi Risiko</h2>
+    <table class="form-table">
+      <tr><td><label>Pilih Nama Risiko</label></td><td><select id="mitigasiNamaRisiko" onchange="isiLevelMitigasi()"></select></td></tr>
+      <tr><td><label>Level Risiko</label></td><td><input id="mitigasiLevelRisiko" class="readonly" readonly></td></tr>
+      <tr><td><label>Strategi Mitigasi</label></td><td><textarea id="strategiMitigasi"></textarea></td></tr>
+    </table>
+    <button type="button" onclick="simpanMitigasi()">Simpan Mitigasi</button>
+  </form>
+
+  <!-- Tombol Ekspor & Analisis -->
+  <div>
+    <button onclick="exportRisiko()" class="export-button">📤 Export Register Risiko</button>
+    <button onclick="exportMitigasi()" class="export-button">📤 Export Mitigasi Risiko</button>
+  </div>
+
+  <!-- Rekap Risiko -->
+  <h2>📊 Rekap Level Risiko per OPD</h2>
+  <canvas id="chartRisiko"></canvas>
+
+  <!-- Rekap Mitigasi Risiko -->
+  <h2>📊 Rekap Mitigasi Risiko</h2>
+  <canvas id="chartMitigasi"></canvas>
+
+  <!-- Script Penyimpanan dan Otomatisasi -->
+  <script>
+    const risikoData = [];
+    const mitigasiData = [];
+
+    function hitungLevelRisiko() {
+      const k = parseInt(document.getElementById('kemungkinan').value) || 0;
+      const d = parseInt(document.getElementById('dampak').value) || 0;
+      const level = k * d;
+      document.getElementById('levelRisiko').value = level;
+      let warna = '';
+      if (level >= 15) warna = '🔴 Ekstrim';
+      else if (level >= 9) warna = '🟠 Tinggi';
+      else if (level >= 4) warna = '🟡 Moderat';
+      else warna = '🟢 Rendah';
+      document.getElementById('warnaRisiko').value = warna;
+    }
+
+    function simpanRisiko() {
+      const entry = {
+        opd: document.getElementById('opd').value,
+        risiko: document.getElementById('namaRisiko').value,
+        level: document.getElementById('levelRisiko').value,
+        warna: document.getElementById('warnaRisiko').value
+      };
+      risikoData.push(entry);
+      updateSelectRisiko();
+      updateChartRisiko();
+      alert("✅ Risiko berhasil disimpan!");
+    }
+
+    function simpanMitigasi() {
+      const entry = {
+        risiko: document.getElementById('mitigasiNamaRisiko').value,
+        level: document.getElementById('mitigasiLevelRisiko').value,
+        strategi: document.getElementById('strategiMitigasi').value
+      };
+      mitigasiData.push(entry);
+      updateChartMitigasi();
+      alert("✅ Mitigasi berhasil disimpan!");
+    }
+
+    function simpanKonteks() {
+      const data = {
+        opd: document.getElementById('konOPD').value,
+        tujuan: document.getElementById('konTujuan').value,
+        sasaran: document.getElementById('konSasaran').value,
+        isu: document.getElementById('konIsu').value,
+        internal: document.getElementById('konInternal').value,
+        eksternal: document.getElementById('konEksternal').value
+      };
+      console.log('Data Konteks:', data);
+      alert("✅ Konteks OPD berhasil disimpan!");
+    }
+
+    function isiLevelMitigasi() {
+      const risiko = document.getElementById('mitigasiNamaRisiko').value;
+      const data = risikoData.find(r => r.risiko === risiko);
+      if (data) {
+        document.getElementById('mitigasiLevelRisiko').value = data.level + ' - ' + data.warna;
+      }
+    }
+
+    function updateSelectRisiko() {
+      const select = document.getElementById('mitigasiNamaRisiko');
+      select.innerHTML = '';
+      risikoData.forEach(r => {
+        const option = document.createElement('option');
+        option.value = r.risiko;
+        option.textContent = r.risiko;
+        select.appendChild(option);
+      });
+    }
+
+    function updateChartRisiko() {
+      const labels = [...new Set(risikoData.map(r => r.opd))];
+      const data = labels.map(opd => {
+        const max = Math.max(...risikoData.filter(r => r.opd === opd).map(r => parseInt(r.level)));
+        return max;
+      });
+      new Chart(document.getElementById('chartRisiko'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{ label: 'Level Risiko Tertinggi', data, backgroundColor: '#e67e22' }]
+        }
+      });
+    }
+
+    function updateChartMitigasi() {
+      const levelLabels = ['🟢 Rendah','🟡 Moderat','🟠 Tinggi','🔴 Ekstrim'];
+      const counts = [0, 0, 0, 0];
+      mitigasiData.forEach(m => {
+        if (m.level.includes('Ekstrim')) counts[3]++;
+        else if (m.level.includes('Tinggi')) counts[2]++;
+        else if (m.level.includes('Moderat')) counts[1]++;
+        else counts[0]++;
+      });
+      new Chart(document.getElementById('chartMitigasi'), {
+        type: 'pie',
+        data: {
+          labels: levelLabels,
+          datasets: [{ data: counts, backgroundColor: ['#2ecc71','#f1c40f','#e67e22','#e74c3c'] }]
+        }
+      });
+    }
+
+    function exportRisiko() {
+      const ws = XLSX.utils.json_to_sheet(risikoData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Register Risiko");
+      XLSX.writeFile(wb, "register_risiko.xlsx");
+    }
+
+    function exportMitigasi() {
+      const ws = XLSX.utils.json_to_sheet(mitigasiData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Mitigasi Risiko");
+      XLSX.writeFile(wb, "mitigasi_risiko.xlsx");
+    }
+  </script>
+</body>
+</html>
